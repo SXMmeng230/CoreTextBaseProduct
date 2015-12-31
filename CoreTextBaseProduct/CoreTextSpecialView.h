@@ -9,10 +9,11 @@
 #import <UIKit/UIKit.h>
 @class CoreTextSpecialView;
 typedef NS_ENUM (NSInteger,CoreTextSpecial_Style){
-    CoreTextSpecial_URL_Style =0, //邮箱
+    CoreTextSpecial_URL_Style =0, //网址
     CoreTextSpecial_Phone_Style, //手机号
     CoreTextSpecial_At_Style,  //@人名
-    CoreTextSpecial_Space_Style //话题
+    CoreTextSpecial_Space_Style, //话题
+    CoreTextSpecial_Email_Style //邮件
 };
 @protocol CoreTextSpecialViewDelegate <NSObject>
 

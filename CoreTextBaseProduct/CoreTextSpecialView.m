@@ -13,7 +13,7 @@ static  NSString *kAtRegularExpression = @"@[\\u4e00-\\u9fa5\\w\\-]+";
 static  NSString *kPhoneNumeberRegularExpression =@"\\d{3}-\\d{8}|\\d{3}-\\d{7}|\\d{4}-\\d{8}|\\d{4}-\\d{7}|1+[358]+\\d{9}|\\d{8}|\\d{7}";
 static NSString *kURLRegularExpression = @"((http[s]{0,1}|ftp)://[a-zA-Z0-9\\.\\-]+\\.([a-zA-Z]{2,4})(:\\d+)?(/[a-zA-Z0-9\\.\\-~!@#$%^&*+?:_/=<>]*)?)|(www.[a-zA-Z0-9\\.\\-]+\\.([a-zA-Z]{2,4})(:\\d+)?(/[a-zA-Z0-9\\.\\-~!@#$%^&*+?:_/=<>]*)?)";
 static NSString *kPoundSignRegularExpression = @"#([\\u4e00-\\u9fa5\\w\\-]+)#";
-
+static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,4}";
 #define kRegularExpression(str) [NSRegularExpression regularExpressionWithPattern:str options:NSRegularExpressionUseUnixLineSeparators|NSRegularExpressionCaseInsensitive error:nil]
 @interface CoreTextSpecialView()
 
@@ -133,7 +133,7 @@ static NSString *kPoundSignRegularExpression = @"#([\\u4e00-\\u9fa5\\w\\-]+)#";
     self.valueArray= [NSMutableArray array];
     self.syleDictionary = [NSMutableDictionary dictionary];
     
-    NSArray *regexps = @[kRegularExpression(kAtRegularExpression) ,kRegularExpression(kPhoneNumeberRegularExpression),kRegularExpression(kURLRegularExpression),kRegularExpression(kPoundSignRegularExpression)];
+    NSArray *regexps = @[kRegularExpression(kAtRegularExpression) ,kRegularExpression(kPhoneNumeberRegularExpression),kRegularExpression(kURLRegularExpression),kRegularExpression(kPoundSignRegularExpression),kRegularExpression(kEmailRegularExpression)];
     for (int i = 0; i < regexps.count; i ++) {
     [regexps[i] enumerateMatchesInString:textStr options:NSMatchingWithTransparentBounds range:NSMakeRange(0, textStr.length) usingBlock:^(NSTextCheckingResult *result, __unused NSMatchingFlags flags, __unused BOOL *stop) {
         NSRegularExpression *expression = regexps[i];
@@ -150,6 +150,9 @@ static NSString *kPoundSignRegularExpression = @"#([\\u4e00-\\u9fa5\\w\\-]+)#";
         }else if ([expression.pattern isEqualToString:kPoundSignRegularExpression]){
             [self.syleDictionary setObject:@3 forKey:result];
             color = [UIColor purpleColor];
+        }else if ([expression.pattern isEqualToString:kEmailRegularExpression]){
+            [self.syleDictionary setObject:@4 forKey:result];
+            color = [UIColor orangeColor];
         }
         [attributed addAttribute:NSForegroundColorAttributeName value:color range:NSMakeRange(result.range.location, result.range.length)];
         [self.valueArray addObject:result];
