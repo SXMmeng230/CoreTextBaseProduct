@@ -25,6 +25,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
 @property (nonatomic, strong) NSMutableDictionary *syleDictionary;
 @property (nonatomic, strong) UIFont *font;
 @property (nonatomic, assign) CGFloat lineHeight;
+@property (nonatomic, assign) CGFloat wordHeight;
 @end
 
 @implementation CoreTextSpecialView
@@ -37,7 +38,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
         self.userInteractionEnabled = YES;
         [self addGestureRecognizer:_tapGesture];
         self.font = [UIFont systemFontOfSize:20];
-        self.lineHeight = 5.0;
+        self.lineHeight = 10.0;
     }
     return self;
 }
@@ -73,7 +74,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
         BOOL isGestureBegin = NO;
         CGPoint point = [gestureRecognizer locationInView:self];
         CGPoint clickPoint = CGPointMake(point.x,self.textHeight - point.y);
-        int indexLine = point.y / (self.font.pointSize * 1.4);
+        int indexLine = point.y / (self.wordHeight + self.lineHeight);
         CFArrayRef lines = CTFrameGetLines(self.frameRef);
         if (indexLine < CFArrayGetCount(lines)) {
             CTLineRef lineRef = CFArrayGetValueAtIndex(lines, indexLine);
@@ -98,30 +99,49 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
     if (self.text.length == 0) {
         return;
     }
+    self.textHeight = [self getHeight];
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSetTextMatrix(context, CGAffineTransformIdentity);
-    CGContextConcatCTM(context, CGAffineTransformMake(1, 0, 0, -1, 0, self.bounds.size.height));
+    CGContextConcatCTM(context, CGAffineTransformMake(1, 0, 0, -1, 0, self.textHeight));
     NSMutableAttributedString *attributedStr = [[NSMutableAttributedString alloc] initWithString:self.text];
     [self setUpAttributed:attributedStr];
     [self sepcialStringWithAttributed:attributedStr text:self.text];
-    self.textHeight = [self getHeight];
     //绘制文字
     CTFramesetterRef framesetterRef = CTFramesetterCreateWithAttributedString((CFAttributedStringRef)attributedStr);
     CGMutablePathRef path = CGPathCreateMutable();
-    CGPathAddRect(path, NULL, CGRectMake(0, 0, self.bounds.size.width, self.bounds.size.height));
+    CGPathAddRect(path, NULL, CGRectMake(0, 0, self.bounds.size.width, self.textHeight));
     CTFrameRef frameRef = CTFramesetterCreateFrame(framesetterRef, CFRangeMake(0, self.text.length), path, NULL);
-    CTFrameDraw(frameRef, context);
+//    CTFrameDraw(frameRef, context);
     self.frameRef = CFRetain(frameRef);
     
     CFArrayRef lines = CTFrameGetLines(frameRef);
     CGPoint lineOrigins[CFArrayGetCount(lines)];
     CTFrameGetLineOrigins(frameRef, CFRangeMake(0, 0), lineOrigins);
+    CGFloat frameY = 0.0;
     for (int i = 0; i < CFArrayGetCount(lines); i ++) {
         CTLineRef line = CFArrayGetValueAtIndex(lines, i);
         CGFloat lineAscent;
         CGFloat lineDescent;
         CGFloat lineLeading;
         CTLineGetTypographicBounds(line, &lineAscent, &lineDescent, &lineLeading);
+        CGPoint lineOrigin = lineOrigins[i];
+        NSLog(@"lineAscent = %f",lineAscent);
+        NSLog(@"lineDescent = %f",lineDescent);
+        NSLog(@"lineLeading = %f",lineLeading);
+        NSLog(@"lineOrigin = %@",NSStringFromCGPoint(lineOrigin));
+        self.wordHeight = lineDescent + lineAscent + lineLeading;
+        NSLog(@"%g  %g",lineDescent + lineAscent + lineLeading,self.font.pointSize);
+        
+        if (i > 0) {
+            frameY =  frameY - self.lineHeight - lineAscent;
+            lineOrigin.y = frameY;
+        }else{
+            frameY = lineOrigin.y;
+        }
+        CGContextSetTextPosition(context, lineOrigin.x, lineOrigin.y);
+        CTLineDraw(line, context);
+        //微调高度
+        frameY = frameY - lineDescent;
     }
     CFRelease(frameRef);
     CFRelease(framesetterRef);
@@ -171,10 +191,10 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
     CTFrameRef frame = CTFramesetterCreateFrame(frameRef, CFRangeMake(0, self.text.length), pathRef, NULL);
     CFArrayRef lineArray = CTFrameGetLines(frame);
     CFIndex lineCount = CFArrayGetCount(lineArray);
-    CGFloat ascent = 0;
-    CGFloat deascent = 0;
-    CGFloat leading = 0;
-    CGFloat totalHeight = 0;
+    CGFloat ascent = 0.0;
+    CGFloat deascent = 0.0;
+    CGFloat leading = 0.0;
+    CGFloat totalHeight = 0.0;
     for (CFIndex i = 0; i < lineCount; i ++) {
         CTLineRef line = CFArrayGetValueAtIndex(lineArray, i);
         CTLineGetTypographicBounds(line, &ascent, &deascent, &leading);
