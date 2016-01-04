@@ -28,9 +28,9 @@
     CoreTextSpecialView *specialView = [[CoreTextSpecialView alloc] initWithFrame:CGRectMake(50, 100, self.view.bounds.size.width - 100, 0)];
     specialView.backgroundColor = [UIColor grayColor];
     specialView.delegate = self;
-    specialView.text =@"#测试富文本#富文 @小萌 😃😁测试富18137270282文本富文efefe测试富文本富文本富文efef文本富文efef文本富文efef@明明 富文13723455433文本富文efef文本富http://baidu.com文efef文本富文efef文本富文efe我爱你SXMmeng230@163.com哈哈爱你爱你哈哈fgvhbjnkmlbfeiewn爱你哈哈爱你哈哈爱你哈哈4567+结束";
+    specialView.text =@"#测试富文本#富文 @小萌 😃😁测试富18137270282文本富文efefe测试富文本富文本富文efef文本富文efef文本富文efef@明明 富文13723455433文本富文efef文本富http://baidu.com文efef文本富文efef文本富文efe我爱你SXMmeng230@163.com哈哈爱你爱你哈哈fgvhbjnkmlbfeiewn爱你[凋谢]哈哈爱[凋谢]你哈哈爱你哈哈4567+结束爱你";
+        specialView.height = [specialView getHeight];
     [self.view addSubview:specialView];
-    specialView.height = [specialView getHeight];
     // Do any additional setup after loading the view, typically from a nib.
 }
 #pragma mark - CoreTextSpecialViewDelegate

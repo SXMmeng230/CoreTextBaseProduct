@@ -14,6 +14,9 @@ static  NSString *kPhoneNumeberRegularExpression =@"\\d{3}-\\d{8}|\\d{3}-\\d{7}|
 static NSString *kURLRegularExpression = @"((http[s]{0,1}|ftp)://[a-zA-Z0-9\\.\\-]+\\.([a-zA-Z]{2,4})(:\\d+)?(/[a-zA-Z0-9\\.\\-~!@#$%^&*+?:_/=<>]*)?)|(www.[a-zA-Z0-9\\.\\-]+\\.([a-zA-Z]{2,4})(:\\d+)?(/[a-zA-Z0-9\\.\\-~!@#$%^&*+?:_/=<>]*)?)";
 static NSString *kPoundSignRegularExpression = @"#([\\u4e00-\\u9fa5\\w\\-]+)#";
 static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,4}";
+//暂时没用
+static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
+
 #define kRegularExpression(str) [NSRegularExpression regularExpressionWithPattern:str options:NSRegularExpressionUseUnixLineSeparators|NSRegularExpressionCaseInsensitive error:nil]
 @interface CoreTextSpecialView()
 
@@ -24,11 +27,25 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
 @property (nonatomic, assign) NSTextCheckingResult *clickResult;
 @property (nonatomic, strong) NSMutableDictionary *syleDictionary;
 @property (nonatomic, strong) UIFont *font;
-@property (nonatomic, assign) CGFloat lineHeight;
+//行间距
+@property (nonatomic, assign) CGFloat lineSpaceHeight;
+//每一行的高度,这个是根据字体大小动态计算出来的
 @property (nonatomic, assign) CGFloat wordHeight;
+//表情字典
+@property (nonatomic, strong) NSDictionary *emojiDictionary;
+@property (nonatomic, strong) NSMutableArray *emojiArray;
 @end
 
 @implementation CoreTextSpecialView
+
+- (NSDictionary *)emojiDictionary
+{
+    if (_emojiDictionary == nil) {
+        NSString *emojiFilePath = [[[NSBundle mainBundle] resourcePath] stringByAppendingPathComponent:@"expressionImage_custom.plist"];
+        _emojiDictionary = [[NSDictionary alloc] initWithContentsOfFile:emojiFilePath];
+    }
+    return _emojiDictionary;
+}
 
 - (instancetype) initWithFrame:(CGRect)frame
 {
@@ -38,10 +55,11 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
         self.userInteractionEnabled = YES;
         [self addGestureRecognizer:_tapGesture];
         self.font = [UIFont systemFontOfSize:20];
-        self.lineHeight = 10.0;
+        self.lineSpaceHeight = 10.0;
     }
     return self;
 }
+
 - (void)tapGes:(UITapGestureRecognizer *)tap
 {
     switch (tap.state) {
@@ -73,8 +91,8 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
     if (gestureRecognizer == self.tapGesture) {
         BOOL isGestureBegin = NO;
         CGPoint point = [gestureRecognizer locationInView:self];
+        int indexLine = point.y / (self.wordHeight + self.lineSpaceHeight);
         CGPoint clickPoint = CGPointMake(point.x,self.textHeight - point.y);
-        int indexLine = point.y / (self.wordHeight + self.lineHeight);
         CFArrayRef lines = CTFrameGetLines(self.frameRef);
         if (indexLine < CFArrayGetCount(lines)) {
             CTLineRef lineRef = CFArrayGetValueAtIndex(lines, indexLine);
@@ -92,6 +110,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
 }
 // Only override drawRect: if you perform custom drawing.
 // An empty implementation adversely affects performance during animation.
+
 #pragma mark - drawRect
 - (void)drawRect:(CGRect)rect {
     // Drawing code
@@ -106,6 +125,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
     NSMutableAttributedString *attributedStr = [[NSMutableAttributedString alloc] initWithString:self.text];
     [self setUpAttributed:attributedStr];
     [self sepcialStringWithAttributed:attributedStr text:self.text];
+
     //绘制文字
     CTFramesetterRef framesetterRef = CTFramesetterCreateWithAttributedString((CFAttributedStringRef)attributedStr);
     CGMutablePathRef path = CGPathCreateMutable();
@@ -125,15 +145,14 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
         CGFloat lineLeading;
         CTLineGetTypographicBounds(line, &lineAscent, &lineDescent, &lineLeading);
         CGPoint lineOrigin = lineOrigins[i];
-        NSLog(@"lineAscent = %f",lineAscent);
-        NSLog(@"lineDescent = %f",lineDescent);
-        NSLog(@"lineLeading = %f",lineLeading);
-        NSLog(@"lineOrigin = %@",NSStringFromCGPoint(lineOrigin));
+//        NSLog(@"lineAscent = %f",lineAscent);
+//        NSLog(@"lineDescent = %f",lineDescent);
+//        NSLog(@"lineLeading = %f",lineLeading);
+//        NSLog(@"lineOrigin = %@",NSStringFromCGPoint(lineOrigin));
         self.wordHeight = lineDescent + lineAscent + lineLeading;
-        NSLog(@"%g  %g",lineDescent + lineAscent + lineLeading,self.font.pointSize);
-        
+//        NSLog(@"%g %g",self.wordHeight,self.font.pointSize);
         if (i > 0) {
-            frameY =  frameY - self.lineHeight - lineAscent;
+            frameY =  frameY - self.lineSpaceHeight - lineAscent;
             lineOrigin.y = frameY;
         }else{
             frameY = lineOrigin.y;
@@ -142,7 +161,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
         CTLineDraw(line, context);
         //微调高度
         frameY = frameY - lineDescent;
-    }
+      }
     CFRelease(frameRef);
     CFRelease(framesetterRef);
     CFRelease(path);
@@ -152,7 +171,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
 {
     self.valueArray= [NSMutableArray array];
     self.syleDictionary = [NSMutableDictionary dictionary];
-    
+//    self.emojiArray = [NSMutableArray array];
     NSArray *regexps = @[kRegularExpression(kAtRegularExpression) ,kRegularExpression(kPhoneNumeberRegularExpression),kRegularExpression(kURLRegularExpression),kRegularExpression(kPoundSignRegularExpression),kRegularExpression(kEmailRegularExpression)];
     for (int i = 0; i < regexps.count; i ++) {
     [regexps[i] enumerateMatchesInString:textStr options:NSMatchingWithTransparentBounds range:NSMakeRange(0, textStr.length) usingBlock:^(NSTextCheckingResult *result, __unused NSMatchingFlags flags, __unused BOOL *stop) {
@@ -178,6 +197,10 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
         [self.valueArray addObject:result];
     }];
     }
+//    [kRegularExpression(kEmojiRegularExpression) enumerateMatchesInString:textStr options:NSMatchingWithTransparentBounds range:NSMakeRange(0, textStr.length) usingBlock:^(NSTextCheckingResult * _Nullable result, NSMatchingFlags flags, BOOL * _Nonnull stop) {
+//        
+//        [self.emojiArray addObject:result];
+//    }];
 }
 //返回文本高度
 - (CGFloat)getHeight{
@@ -200,7 +223,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
         CTLineGetTypographicBounds(line, &ascent, &deascent, &leading);
         totalHeight += ascent + deascent + leading;
     }
-    totalHeight += lineCount * self.lineHeight;
+    totalHeight += lineCount * self.lineSpaceHeight;
     CFRelease(frame);
     CFRelease(pathRef);
     CFRelease(frameRef);
@@ -210,7 +233,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
 - (void)setUpAttributed:(NSMutableAttributedString *)attriStr
 {
     NSMutableParagraphStyle *paragraph = [[NSMutableParagraphStyle alloc] init];
-    paragraph.lineSpacing = self.lineHeight;
+    paragraph.lineSpacing = self.lineSpaceHeight;
     paragraph.lineBreakMode = NSLineBreakByCharWrapping;
     [attriStr addAttribute:NSParagraphStyleAttributeName value:paragraph range:NSMakeRange(0, attriStr.length)];
     [attriStr addAttribute:NSFontAttributeName value:self.font range:NSMakeRange(0, attriStr.length)];
