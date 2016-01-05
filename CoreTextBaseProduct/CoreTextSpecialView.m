@@ -18,6 +18,7 @@ static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\
 static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
 
 #define kRegularExpression(str) [NSRegularExpression regularExpressionWithPattern:str options:NSRegularExpressionUseUnixLineSeparators|NSRegularExpressionCaseInsensitive error:nil]
+
 @interface CoreTextSpecialView()
 
 @property (nonatomic, strong) UITapGestureRecognizer *tapGesture;
@@ -54,8 +55,8 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
         _tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGes:)];
         self.userInteractionEnabled = YES;
         [self addGestureRecognizer:_tapGesture];
-        self.font = [UIFont systemFontOfSize:20];
-        self.lineSpaceHeight = 10.0;
+        self.font = [UIFont systemFontOfSize:20.0f];
+        self.lineSpaceHeight = 10.0f;
     }
     return self;
 }
@@ -89,9 +90,15 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
 {
     if (gestureRecognizer == self.tapGesture) {
-        BOOL isGestureBegin = NO;
+//        BOOL isGestureBegin = NO;
         CGPoint point = [gestureRecognizer locationInView:self];
-        int indexLine = point.y / (self.wordHeight + self.lineSpaceHeight);
+        //方式一:确定点击位置
+       return  [self isGestureIndexPoint:point];
+        
+        //方式二:确定点击位置
+//        int indexLine = point.y / (self.wordHeight + self.lineSpaceHeight);
+        /*
+        int indexLine = point.y / (self.font.pointSize + self.lineSpaceHeight);
         CGPoint clickPoint = CGPointMake(point.x,self.textHeight - point.y);
         CFArrayRef lines = CTFrameGetLines(self.frameRef);
         if (indexLine < CFArrayGetCount(lines)) {
@@ -105,8 +112,41 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
             }
         }
         return isGestureBegin;
+         */
     }
     return NO;
+}
+- (BOOL)isGestureIndexPoint:(CGPoint)point
+{
+    BOOL isGesture = NO;
+    CFArrayRef lines = CTFrameGetLines(self.frameRef);
+    CGPoint lineOrigins[CFArrayGetCount(lines)];
+    CTFrameGetLineOrigins(self.frameRef, CFRangeMake(0, 0), lineOrigins);
+    // 翻转坐标系
+    CGAffineTransform transform =  CGAffineTransformMakeTranslation(0, self.bounds.size.height);
+    transform = CGAffineTransformScale(transform, 1.f, -1.f);
+
+    for (CFIndex i = 0; i < CFArrayGetCount(lines); i ++) {
+        CTLineRef lineRef = CFArrayGetValueAtIndex(lines, i);
+        CGPoint linePoint = lineOrigins[i];
+        CGRect fileRect = CGRectMake(linePoint.x, linePoint.y, self.bounds.size.width, self.font.pointSize + self.lineSpaceHeight);
+        CGRect rect = CGRectApplyAffineTransform(fileRect, transform);
+        if (CGRectContainsPoint(rect, point)) {
+            // 将点击的坐标转换成相对于当前行的坐标
+            CGPoint relativePoint = CGPointMake(point.x-CGRectGetMinX(rect),point.y-CGRectGetMinY(rect));
+            // 获得当前点击坐标对应的字符串偏移
+           CFIndex strIndex = CTLineGetStringIndexForPosition(lineRef, relativePoint);
+            for ( NSTextCheckingResult*result in self.valueArray) {
+                if (strIndex >=result.range.location && strIndex <= (result.range.location +result.range.length)) {
+                    self.clickResult = result;
+                    isGesture = YES;
+                }
+            }
+            break;
+        }
+
+    }
+    return isGesture;
 }
 // Only override drawRect: if you perform custom drawing.
 // An empty implementation adversely affects performance during animation.
@@ -122,7 +162,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     CGContextRef context = UIGraphicsGetCurrentContext();
     CGContextSetTextMatrix(context, CGAffineTransformIdentity);
     CGContextConcatCTM(context, CGAffineTransformMake(1, 0, 0, -1, 0, self.textHeight));
-    NSMutableAttributedString *attributedStr = [[NSMutableAttributedString alloc] initWithString:self.text];
+    NSMutableAttributedString *attributedStr = [self getAttributedForText:self.text];
     [self setUpAttributed:attributedStr];
     [self sepcialStringWithAttributed:attributedStr text:self.text];
 
@@ -145,22 +185,49 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
         CGFloat lineLeading;
         CTLineGetTypographicBounds(line, &lineAscent, &lineDescent, &lineLeading);
         CGPoint lineOrigin = lineOrigins[i];
-//        NSLog(@"lineAscent = %f",lineAscent);
-//        NSLog(@"lineDescent = %f",lineDescent);
-//        NSLog(@"lineLeading = %f",lineLeading);
-//        NSLog(@"lineOrigin = %@",NSStringFromCGPoint(lineOrigin));
+        //方式一:根据文字计算每个文字的位置
+        /*
         self.wordHeight = lineDescent + lineAscent + lineLeading;
-//        NSLog(@"%g %g",self.wordHeight,self.font.pointSize);
         if (i > 0) {
             frameY =  frameY - self.lineSpaceHeight - lineAscent;
             lineOrigin.y = frameY;
         }else{
             frameY = lineOrigin.y;
         }
+         */
+        //方式二:固定高度计算每个文字的位置
+        CGFloat lineHeight = self.font.pointSize;
+        frameY = self.textHeight - (i + 1)*(lineHeight) - i * self.lineSpaceHeight - self.font.descender;
+        
+        
         CGContextSetTextPosition(context, lineOrigin.x, lineOrigin.y);
         CTLineDraw(line, context);
         //微调高度
         frameY = frameY - lineDescent;
+        
+        //绘制表情或图片
+        CFArrayRef runs = CTLineGetGlyphRuns(line);
+        for (int j = 0; j < CFArrayGetCount(runs); j ++) {
+            CGFloat runAscent;
+            CGFloat runDescent;
+            CGPoint lineOrigin = lineOrigins[i];
+            CTRunRef run = CFArrayGetValueAtIndex(runs, j);
+            NSDictionary* attributes = (NSDictionary*)CTRunGetAttributes(run);
+            CGRect runRect;
+            runRect.size.width = CTRunGetTypographicBounds(run, CFRangeMake(0,0), &runAscent, &runDescent, NULL);
+            runRect=CGRectMake(lineOrigin.x + CTLineGetOffsetForStringIndex(line, CTRunGetStringRange(run).location, NULL), lineOrigin.y - runDescent, runRect.size.width, runAscent + runDescent);
+            NSString *imageName = attributes[@"imageStr"];
+                UIImage *image = [UIImage imageNamed:imageName];
+                if (image) {
+                    CGRect imageDrawRect;
+                    imageDrawRect.size = image.size;
+                    imageDrawRect.origin.x = runRect.origin.x + lineOrigin.x;
+                    imageDrawRect.origin.y = lineOrigin.y;
+                    //微调Y
+                    imageDrawRect.origin.y -= self.lineSpaceHeight * 0.5;
+                    CGContextDrawImage(context, imageDrawRect, image.CGImage);
+                }
+        }
       }
     CFRelease(frameRef);
     CFRelease(framesetterRef);
@@ -171,7 +238,6 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
 {
     self.valueArray= [NSMutableArray array];
     self.syleDictionary = [NSMutableDictionary dictionary];
-//    self.emojiArray = [NSMutableArray array];
     NSArray *regexps = @[kRegularExpression(kAtRegularExpression) ,kRegularExpression(kPhoneNumeberRegularExpression),kRegularExpression(kURLRegularExpression),kRegularExpression(kPoundSignRegularExpression),kRegularExpression(kEmailRegularExpression)];
     for (int i = 0; i < regexps.count; i ++) {
     [regexps[i] enumerateMatchesInString:textStr options:NSMatchingWithTransparentBounds range:NSMakeRange(0, textStr.length) usingBlock:^(NSTextCheckingResult *result, __unused NSMatchingFlags flags, __unused BOOL *stop) {
@@ -197,10 +263,6 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
         [self.valueArray addObject:result];
     }];
     }
-//    [kRegularExpression(kEmojiRegularExpression) enumerateMatchesInString:textStr options:NSMatchingWithTransparentBounds range:NSMakeRange(0, textStr.length) usingBlock:^(NSTextCheckingResult * _Nullable result, NSMatchingFlags flags, BOOL * _Nonnull stop) {
-//        
-//        [self.emojiArray addObject:result];
-//    }];
 }
 //返回文本高度
 - (CGFloat)getHeight{
@@ -214,16 +276,22 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     CTFrameRef frame = CTFramesetterCreateFrame(frameRef, CFRangeMake(0, self.text.length), pathRef, NULL);
     CFArrayRef lineArray = CTFrameGetLines(frame);
     CFIndex lineCount = CFArrayGetCount(lineArray);
+    CGFloat totalHeight = 0.0;
+    //方式一: 根据文字动态计算文本总高度
+    /*
     CGFloat ascent = 0.0;
     CGFloat deascent = 0.0;
     CGFloat leading = 0.0;
-    CGFloat totalHeight = 0.0;
     for (CFIndex i = 0; i < lineCount; i ++) {
         CTLineRef line = CFArrayGetValueAtIndex(lineArray, i);
         CTLineGetTypographicBounds(line, &ascent, &deascent, &leading);
-        totalHeight += ascent + deascent + leading;
+//        totalHeight += ascent + deascent + leading;
     }
-    totalHeight += lineCount * self.lineSpaceHeight;
+     totalHeight += lineCount *self.lineSpaceHeight;
+     */
+    //方式二: 每行高度固定,计算文本总高度
+    totalHeight = lineCount * (self.font.pointSize + self.lineSpaceHeight);
+    
     CFRelease(frame);
     CFRelease(pathRef);
     CFRelease(frameRef);
@@ -237,6 +305,76 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     paragraph.lineBreakMode = NSLineBreakByCharWrapping;
     [attriStr addAttribute:NSParagraphStyleAttributeName value:paragraph range:NSMakeRange(0, attriStr.length)];
     [attriStr addAttribute:NSFontAttributeName value:self.font range:NSMakeRange(0, attriStr.length)];
+}
+//返回经过处理后的NSMutableAttributedString
+- (NSMutableAttributedString *)getAttributedForText:(NSString *)text
+{
+    NSMutableAttributedString *attributedStr = [[NSMutableAttributedString alloc] init];
+    self.emojiArray = [NSMutableArray array];
+
+    [kRegularExpression(kEmojiRegularExpression) enumerateMatchesInString:text options:NSMatchingWithTransparentBounds range:NSMakeRange(0, text.length) usingBlock:^(NSTextCheckingResult * _Nullable result, NSMatchingFlags flags, BOOL * _Nonnull stop) {
+        [self.emojiArray addObject:result];
+    }];    
+    NSInteger index = 0;
+    for (NSTextCheckingResult *result in self.emojiArray) {
+        NSRange range = result.range;
+        NSString *startStr = [text substringWithRange:NSMakeRange(index, range.location - index)];
+        NSMutableAttributedString *startAtt = [[NSMutableAttributedString alloc] initWithString:startStr];
+        [attributedStr appendAttributedString:startAtt];
+        
+        NSString *emojiKey = [text substringWithRange:range];
+        NSString *imageStr = self.emojiDictionary[emojiKey];
+        if (imageStr) {
+            NSMutableString *place = [NSMutableString string];
+            for (int i = 0 ; i < emojiKey.length; i ++) {
+                [place appendFormat:@" "];
+            }
+            NSMutableAttributedString *imageAtt = [[NSMutableAttributedString alloc] initWithString:place];
+            CTRunDelegateCallbacks imageCallBacks;
+            imageCallBacks.version =kCTRunDelegateVersion1;
+            imageCallBacks.getAscent = RunDelegateGetAscentSpecialCallback;
+            imageCallBacks.getDescent = RunDelegateGetDescentSpecialCallback;
+            imageCallBacks.getWidth = RunDelegateGetWidthSpecialCallback;
+            imageCallBacks.dealloc = RunDelegateDeallocSpecialCallback;
+            CTRunDelegateRef runDelegateRef = CTRunDelegateCreate(&imageCallBacks, (__bridge void * _Nullable)(self.font));
+            [imageAtt addAttributes:@{(NSString *)kCTRunDelegateAttributeName:(__bridge id)runDelegateRef} range:NSMakeRange(0,1)];
+            [imageAtt addAttributes:@{@"imageStr":imageStr} range:NSMakeRange(0,1)];
+            [attributedStr appendAttributedString:imageAtt];
+            CFRelease(runDelegateRef);
+
+        }else{
+            NSMutableAttributedString *textAtt = [[NSMutableAttributedString alloc] initWithString:emojiKey];
+            [attributedStr appendAttributedString:textAtt];
+        }
+        index = range.location + range.length;
+    }
+    if (index < text.length) {
+        NSRange otherRange = NSMakeRange(index, text.length - index);
+        NSString *otherText = [text substringWithRange:otherRange];
+        NSMutableAttributedString *otherTextAtt = [[NSMutableAttributedString alloc] initWithString:otherText];
+        [attributedStr appendAttributedString:otherTextAtt];
+    }
+    return attributedStr;
+}
+//block
+void RunDelegateDeallocSpecialCallback( void* refCon ){
+    
+}
+CGFloat RunDelegateGetAscentSpecialCallback (void * refCon){
+//    NSString *image = (__bridge NSString *)refCon;
+    UIFont *font = (__bridge UIFont *)refCon;
+    return font.pointSize * 0.5;
+//    return [UIImage imageNamed:image].size.height;
+}
+CGFloat RunDelegateGetDescentSpecialCallback(void *refCon){
+    return 0;
+}
+
+CGFloat RunDelegateGetWidthSpecialCallback(void *refCon){
+    UIFont *font = (__bridge UIFont *)refCon;
+    return font.pointSize * 0.5;
+//    NSString *imageName = (__bridge NSString *)refCon;
+//    return [UIImage imageNamed:imageName].size.width;
 }
 
 @end
