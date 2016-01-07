@@ -8,20 +8,20 @@
 
 #import "CoreTextSpecialView.h"
 #import <CoreText/CoreText.h>
+
 #import "UIView+Frame.h"
 static  NSString *kAtRegularExpression = @"@[\\u4e00-\\u9fa5\\w\\-]+";
 static  NSString *kPhoneNumeberRegularExpression =@"\\d{3}-\\d{8}|\\d{3}-\\d{7}|\\d{4}-\\d{8}|\\d{4}-\\d{7}|1+[358]+\\d{9}|\\d{8}|\\d{7}";
 static NSString *kURLRegularExpression = @"((http[s]{0,1}|ftp)://[a-zA-Z0-9\\.\\-]+\\.([a-zA-Z]{2,4})(:\\d+)?(/[a-zA-Z0-9\\.\\-~!@#$%^&*+?:_/=<>]*)?)|(www.[a-zA-Z0-9\\.\\-]+\\.([a-zA-Z]{2,4})(:\\d+)?(/[a-zA-Z0-9\\.\\-~!@#$%^&*+?:_/=<>]*)?)";
 static NSString *kPoundSignRegularExpression = @"#([\\u4e00-\\u9fa5\\w\\-]+)#";
 static NSString *kEmailRegularExpression = @"[A-Z0-9a-z\\._%+-]+@([A-Za-z0-9-]+\\.)+[A-Za-z]{2,4}";
-//暂时没用
 static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
 
 #define kRegularExpression(str) [NSRegularExpression regularExpressionWithPattern:str options:NSRegularExpressionUseUnixLineSeparators|NSRegularExpressionCaseInsensitive error:nil]
 
+#define kClickBackViewColor   [UIColor colorWithRed:0/255.0 green:0/255.0  blue:0/255.0  alpha:0.4]
 @interface CoreTextSpecialView()
 
-@property (nonatomic, strong) UITapGestureRecognizer *tapGesture;
 @property (nonatomic, assign) CGFloat textHeight;
 @property (nonatomic, assign) CTFrameRef frameRef;
 @property (nonatomic, strong) NSMutableArray *valueArray;
@@ -38,7 +38,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
 @end
 
 @implementation CoreTextSpecialView
-
+#pragma mark - setter-getter
 - (NSDictionary *)emojiDictionary
 {
     if (_emojiDictionary == nil) {
@@ -47,77 +47,33 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     }
     return _emojiDictionary;
 }
-
+#pragma mark - lift Circle
 - (instancetype) initWithFrame:(CGRect)frame
 {
     self = [super initWithFrame:frame];
     if (self) {
-        _tapGesture = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGes:)];
-        self.userInteractionEnabled = YES;
-        [self addGestureRecognizer:_tapGesture];
-        self.font = [UIFont systemFontOfSize:20.0f];
-        self.lineSpaceHeight = 10.0f;
+        [self setInit];
     }
     return self;
 }
-
-- (void)tapGes:(UITapGestureRecognizer *)tap
+- (instancetype)initWithCoder:(NSCoder *)aDecoder
 {
-    switch (tap.state) {
-        case UIGestureRecognizerStateBegan:
-            break;
-        case UIGestureRecognizerStateChanged:
-            break;
-        case UIGestureRecognizerStateEnded:
-        {
-            if (self.clickResult.range.length != 0)
-            {
-                NSString *clickStr = [self.text substringWithRange:self.clickResult.range];
-                if ([self.delegate respondsToSelector:@selector(clickCoreTextSpecialView:coreText:style:)]) {
-                    NSNumber *style = [self.syleDictionary objectForKey:self.clickResult];
-                    [self.delegate clickCoreTextSpecialView:self coreText:clickStr style:(CoreTextSpecial_Style)style.integerValue];
-                }
-            }
-        }
-            break;
-        case UIGestureRecognizerStateFailed:
-            break;
-        default:
-            break;
+    self = [super initWithCoder:aDecoder];
+    if (self) {
+        [self setInit];
     }
+    return self;
 }
-#pragma mark - UIGestureRecognizerDelegate
-- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer
+- (void)setInit
 {
-    if (gestureRecognizer == self.tapGesture) {
-//        BOOL isGestureBegin = NO;
-        CGPoint point = [gestureRecognizer locationInView:self];
-        //方式一:确定点击位置
-       return  [self isGestureIndexPoint:point];
-        
-        //方式二:确定点击位置
-//        int indexLine = point.y / (self.wordHeight + self.lineSpaceHeight);
-        /*
-        int indexLine = point.y / (self.font.pointSize + self.lineSpaceHeight);
-        CGPoint clickPoint = CGPointMake(point.x,self.textHeight - point.y);
-        CFArrayRef lines = CTFrameGetLines(self.frameRef);
-        if (indexLine < CFArrayGetCount(lines)) {
-            CTLineRef lineRef = CFArrayGetValueAtIndex(lines, indexLine);
-            CFIndex strIndex = CTLineGetStringIndexForPosition(lineRef, clickPoint);
-            for ( NSTextCheckingResult*result in self.valueArray) {
-                if (strIndex >=result.range.location && strIndex <= (result.range.location +result.range.length)) {
-                    self.clickResult = result;
-                    isGestureBegin = YES;
-                }
-            }
-        }
-        return isGestureBegin;
-         */
-    }
-    return NO;
+    self.userInteractionEnabled = YES;
+    self.font = [UIFont systemFontOfSize:20.0f];
+    self.lineSpaceHeight = 10.0f;
 }
+#pragma mark - 根据点击位置,返回点击结果
 - (BOOL)isGestureIndexPoint:(CGPoint)point
 {
+    //方式一:确定位置
     BOOL isGesture = NO;
     CFArrayRef lines = CTFrameGetLines(self.frameRef);
     CGPoint lineOrigins[CFArrayGetCount(lines)];
@@ -129,7 +85,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     for (CFIndex i = 0; i < CFArrayGetCount(lines); i ++) {
         CTLineRef lineRef = CFArrayGetValueAtIndex(lines, i);
         CGPoint linePoint = lineOrigins[i];
-        CGRect fileRect = CGRectMake(linePoint.x, linePoint.y, self.bounds.size.width, self.font.pointSize + self.lineSpaceHeight);
+        CGRect fileRect = CGRectMake(linePoint.x, linePoint.y, self.bounds.size.width, self.font.pointSize);
         CGRect rect = CGRectApplyAffineTransform(fileRect, transform);
         if (CGRectContainsPoint(rect, point)) {
             // 将点击的坐标转换成相对于当前行的坐标
@@ -137,24 +93,78 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
             // 获得当前点击坐标对应的字符串偏移
            CFIndex strIndex = CTLineGetStringIndexForPosition(lineRef, relativePoint);
             for ( NSTextCheckingResult*result in self.valueArray) {
-                if (strIndex >=result.range.location && strIndex <= (result.range.location +result.range.length)) {
-                    self.clickResult = result;
+                if (NSLocationInRange(strIndex, result.range)) {
+                    self.clickResult = (__bridge NSTextCheckingResult *)(CFRetain((__bridge CFTypeRef)(result)));
                     isGesture = YES;
+
                 }
             }
-            break;
         }
 
     }
     return isGesture;
+    
+    //方式二:确定点击位置
+    //        int indexLine = point.y / (self.wordHeight + self.lineSpaceHeight);
+    /*
+     int indexLine = point.y / (self.font.pointSize + self.lineSpaceHeight);
+     CGPoint clickPoint = CGPointMake(point.x,self.textHeight - point.y);
+     CFArrayRef lines = CTFrameGetLines(self.frameRef);
+     if (indexLine < CFArrayGetCount(lines)) {
+     CTLineRef lineRef = CFArrayGetValueAtIndex(lines, indexLine);
+     CFIndex strIndex = CTLineGetStringIndexForPosition(lineRef, clickPoint);
+     for ( NSTextCheckingResult*result in self.valueArray) {
+     if (strIndex >=result.range.location && strIndex <= (result.range.location +result.range.length)) {
+     self.clickResult = result;
+     isGestureBegin = YES;
+     }
+     }
+     }
+     return isGestureBegin;
+     */
+
+}
+#pragma mark - touches
+- (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    UITouch *touch = [touches anyObject];
+    BOOL isGestur = [self isGestureIndexPoint:[touch locationInView:self]];
+    if (isGestur) {
+        [self setNeedsDisplay];
+    }
+}
+- (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
+{
+    if (self.clickResult.range.length != 0)
+    {
+        NSString *clickStr = [self.text substringWithRange:self.clickResult.range];
+        if ([self.delegate respondsToSelector:@selector(clickCoreTextSpecialView:coreText:style:)]) {
+            NSNumber *style = [self.syleDictionary objectForKey:self.clickResult];
+            [self.delegate clickCoreTextSpecialView:self coreText:clickStr style:(CoreTextSpecial_Style)style.integerValue];
+            self.clickResult = nil;
+            [self setNeedsDisplay];
+        }
+    }
 }
 // Only override drawRect: if you perform custom drawing.
 // An empty implementation adversely affects performance during animation.
-
+#pragma mark - drawBackView
+- (void)drawBackViewContextRef:(CGContextRef)ctx Rect:(CGRect)rect
+{
+    //设置笔触颜色
+    CGContextSetStrokeColorWithColor(ctx,kClickBackViewColor.CGColor);
+    //设置笔触宽度
+    CGContextSetLineWidth(ctx, 1);
+    //设置填充色
+    CGContextSetFillColorWithColor(ctx,kClickBackViewColor.CGColor);
+    CGContextAddRect(ctx, rect);
+    CGContextFillPath(ctx);
+    
+}
 #pragma mark - drawRect
 - (void)drawRect:(CGRect)rect {
     // Drawing code
-    
+
     if (self.text.length == 0) {
         return;
     }
@@ -199,9 +209,9 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
         CGFloat lineHeight = self.font.pointSize;
         frameY = self.textHeight - (i + 1)*(lineHeight) - i * self.lineSpaceHeight - self.font.descender;
         
-        
         CGContextSetTextPosition(context, lineOrigin.x, lineOrigin.y);
         CTLineDraw(line, context);
+
         //微调高度
         frameY = frameY - lineDescent;
         
@@ -216,6 +226,13 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
             CGRect runRect;
             runRect.size.width = CTRunGetTypographicBounds(run, CFRangeMake(0,0), &runAscent, &runDescent, NULL);
             runRect=CGRectMake(lineOrigin.x + CTLineGetOffsetForStringIndex(line, CTRunGetStringRange(run).location, NULL), lineOrigin.y - runDescent, runRect.size.width, runAscent + runDescent);
+            //点击背景
+            if (self.clickResult.range.length != 0) {
+                CFIndex strIndex = CTLineGetStringIndexForPosition(line, runRect.origin);
+                if (NSLocationInRange(strIndex, self.clickResult.range)) {
+                    [self drawBackViewContextRef:context Rect:runRect];
+                }
+            }
             NSString *imageName = attributes[@"imageStr"];
                 UIImage *image = [UIImage imageNamed:imageName];
                 if (image) {
@@ -233,7 +250,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     CFRelease(framesetterRef);
     CFRelease(path);
 }
-//定制文字
+#pragma mark - 定制特殊文字
 - (void)sepcialStringWithAttributed:(NSMutableAttributedString *)attributed text:(NSString *)textStr
 {
     self.valueArray= [NSMutableArray array];
@@ -264,7 +281,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     }];
     }
 }
-//返回文本高度
+#pragma mark - 返回文本高度
 - (CGFloat)getHeight{
     NSMutableAttributedString *attribut = [[NSMutableAttributedString alloc] initWithString:self.text];
     [self setUpAttributed:attribut];
@@ -297,7 +314,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     CFRelease(frameRef);
     return  totalHeight;
 }
-//设置样式 如:行间距,字体颜色等
+#pragma mark - 设置样式 如:行间距,字体颜色等
 - (void)setUpAttributed:(NSMutableAttributedString *)attriStr
 {
     NSMutableParagraphStyle *paragraph = [[NSMutableParagraphStyle alloc] init];
@@ -306,12 +323,11 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     [attriStr addAttribute:NSParagraphStyleAttributeName value:paragraph range:NSMakeRange(0, attriStr.length)];
     [attriStr addAttribute:NSFontAttributeName value:self.font range:NSMakeRange(0, attriStr.length)];
 }
-//返回经过处理后的NSMutableAttributedString
+#pragma mark - 返回经过处理后的NSMutableAttributedString
 - (NSMutableAttributedString *)getAttributedForText:(NSString *)text
 {
     NSMutableAttributedString *attributedStr = [[NSMutableAttributedString alloc] init];
     self.emojiArray = [NSMutableArray array];
-
     [kRegularExpression(kEmojiRegularExpression) enumerateMatchesInString:text options:NSMatchingWithTransparentBounds range:NSMakeRange(0, text.length) usingBlock:^(NSTextCheckingResult * _Nullable result, NSMatchingFlags flags, BOOL * _Nonnull stop) {
         [self.emojiArray addObject:result];
     }];    
@@ -356,7 +372,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     }
     return attributedStr;
 }
-//block
+#pragma mark - 私有方法
 void RunDelegateDeallocSpecialCallback( void* refCon ){
     
 }

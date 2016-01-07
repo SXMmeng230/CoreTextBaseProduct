@@ -20,7 +20,7 @@ typedef NS_ENUM (NSInteger,CoreTextSpecial_Style){
 - (void)clickCoreTextSpecialView:(CoreTextSpecialView *)view coreText:(NSString *)text style:(CoreTextSpecial_Style)style;
 
 @end
-@interface CoreTextSpecialView : UIView<UIGestureRecognizerDelegate>
+@interface CoreTextSpecialView : UIView
 @property (nonatomic, copy) NSString *text;
 @property (nonatomic, assign) id <CoreTextSpecialViewDelegate>delegate;
 - (CGFloat)getHeight;
