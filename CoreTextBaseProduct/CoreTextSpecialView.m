@@ -19,7 +19,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
 
 #define kRegularExpression(str) [NSRegularExpression regularExpressionWithPattern:str options:NSRegularExpressionUseUnixLineSeparators|NSRegularExpressionCaseInsensitive error:nil]
 
-#define kClickBackViewColor   [UIColor colorWithRed:0/255.0 green:0/255.0  blue:0/255.0  alpha:0.4]
+#define kClickBackViewColor  [UIColor colorWithRed:0/255.0 green:0/255.0  blue:0/255.0  alpha:0.4]
 @interface CoreTextSpecialView()
 
 @property (nonatomic, assign) CGFloat textHeight;
@@ -95,6 +95,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
             for ( NSTextCheckingResult*result in self.valueArray) {
                 if (NSLocationInRange(strIndex, result.range)) {
                     self.clickResult = (__bridge NSTextCheckingResult *)(CFRetain((__bridge CFTypeRef)(result)));
+//                    self.clickResult = result;
                     isGesture = YES;
 
                 }
@@ -132,6 +133,7 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     if (isGestur) {
         [self setNeedsDisplay];
     }
+    [super touchesBegan:touches withEvent:event];
 }
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event
 {
@@ -139,12 +141,13 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
     {
         NSString *clickStr = [self.text substringWithRange:self.clickResult.range];
         if ([self.delegate respondsToSelector:@selector(clickCoreTextSpecialView:coreText:style:)]) {
-            NSNumber *style = [self.syleDictionary objectForKey:self.clickResult];
+            NSNumber *style = [self.syleDictionary objectForKey:NSStringFromRange(self.clickResult.range)];
             [self.delegate clickCoreTextSpecialView:self coreText:clickStr style:(CoreTextSpecial_Style)style.integerValue];
             self.clickResult = nil;
             [self setNeedsDisplay];
         }
     }
+    [super touchesEnded:touches withEvent:event];
 }
 // Only override drawRect: if you perform custom drawing.
 // An empty implementation adversely affects performance during animation.
@@ -261,19 +264,19 @@ static NSString *kEmojiRegularExpression= @"\\[[a-zA-Z0-9\\u4e00-\\u9fa5]+\\]";
         NSRegularExpression *expression = regexps[i];
         UIColor *color = [UIColor redColor];
         if ([expression.pattern isEqualToString:kAtRegularExpression]) {
-            [self.syleDictionary setObject:@2 forKey:result];
+            [self.syleDictionary setObject:@2 forKey:NSStringFromRange(result.range)];
             color = [UIColor redColor];
         }else if ([expression.pattern isEqualToString:kPhoneNumeberRegularExpression]){
-            [self.syleDictionary setObject:@1 forKey:result];
+            [self.syleDictionary setObject:@1 forKey:NSStringFromRange(result.range)];
             color = [UIColor blueColor];
         }else if ([expression.pattern isEqualToString:kURLRegularExpression]){
-            [self.syleDictionary setObject:@0 forKey:result];
+            [self.syleDictionary setObject:@0 forKey:NSStringFromRange(result.range)];
             color = [UIColor greenColor];
         }else if ([expression.pattern isEqualToString:kPoundSignRegularExpression]){
-            [self.syleDictionary setObject:@3 forKey:result];
+            [self.syleDictionary setObject:@3 forKey:NSStringFromRange(result.range)];
             color = [UIColor purpleColor];
         }else if ([expression.pattern isEqualToString:kEmailRegularExpression]){
-            [self.syleDictionary setObject:@4 forKey:result];
+            [self.syleDictionary setObject:@4 forKey:NSStringFromRange(result.range)];
             color = [UIColor orangeColor];
         }
         [attributed addAttribute:NSForegroundColorAttributeName value:color range:NSMakeRange(result.range.location, result.range.length)];
